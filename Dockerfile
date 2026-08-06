@@ -70,7 +70,7 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/hermes/.playwright
 # hermes process, the dashboard, and per-profile gateways.
 RUN apt-get -o Acquire::Retries=3 update && \
     apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
-    ca-certificates curl iputils-ping python3 python-is-python3 ripgrep ffmpeg gcc g++ make cmake python3-dev python3-venv libffi-dev libolm-dev libatomic1 procps git openssh-client docker-cli xz-utils && \
+    ca-certificates curl iputils-ping python3 python-is-python3 ripgrep ffmpeg gcc g++ make cmake python3-dev python3-venv libffi-dev libolm-dev libatomic1 procps git golang openssh-client docker-cli xz-utils && \
     rm -rf /var/lib/apt/lists/*
 
 # Prefer the fixed SQLite over Debian's vulnerable libsqlite3.so.0. Keep the
@@ -166,7 +166,25 @@ COPY --from=node_source /usr/local/lib/node_modules/npm /usr/local/lib/node_modu
 RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
     ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
-WORKDIR /opt/hermes
+
+# --- Install Basecamp CLI ---
+# Create a temporary directory for cloning and building the Basecamp CLI
+WORKDIR /tmp/basecamp-cli-build
+
+# Clone the Basecamp CLI repository
+RUN git clone https://github.com/basecamp/basecamp-cli.git .
+
+# Build and install the Basecamp CLI
+# 'go install' places the binary in GOPATH/bin (default ~/go/bin).
+# We then copy it to /usr/local/bin so it's directly accessible in PATH.
+# Finally, clean up temporary source and Go build cache.
+RUN go install github.com/basecamp/basecamp-cli/cmd/basecamp@latest && \
+    cp "$(find /root/go/bin -name "basecamp")" /usr/local/bin/basecamp && \
+    rm -rf /root/go
+
+# Return to Hermes Agent's working directory
+WORKDIR /opt/hermes    
+
 
 # ---------- Layer-cached dependency install ----------
 # Copy only package manifests first so npm install + Playwright are cached
